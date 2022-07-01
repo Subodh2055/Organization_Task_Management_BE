@@ -6,10 +6,7 @@ import com.example.client.user.service.UserService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -18,6 +15,18 @@ import java.util.List;
 @RequestMapping("/api/users")
 public class UsersController {
     private final UserService userService;
+
+    @GetMapping("/findByEmail/{email}")
+    public ResponseEntity<User> findCustomerByEmail(@PathVariable String email){
+        User userEmail = userService.findByEmail(email);
+        return new ResponseEntity<>(userEmail, HttpStatus.OK);
+    }
+
+    @GetMapping("/findByUserName/{userName}")
+    public ResponseEntity<User> findCustomerByUserName(@PathVariable String userName){
+        User userName1 = userService.findByUserName(userName);
+        return new ResponseEntity<>(userName1, HttpStatus.OK);
+    }
 
 
 //    @PostMapping("/add")
