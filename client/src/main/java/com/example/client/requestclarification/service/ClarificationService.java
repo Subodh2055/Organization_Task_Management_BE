@@ -21,8 +21,10 @@ public class ClarificationService {
     public Clarification addClarification( Clarification clarification){
         return clarificationRepository.save(clarification);
     }
-    public Clarification findClarificationById(Long id) {
-        return clarificationRepository.findClarificationById(id);
+    public Clarification findClarificationById(Long id) throws ClassNotFoundException {
+        return clarificationRepository.findClarificationById(id)
+                .orElseThrow(()->
+                    new ClassNotFoundException("Clarification by id" + id + "Was not Found"));
     }
 
     public List<Clarification>findAllClarifications(){

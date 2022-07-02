@@ -45,6 +45,7 @@ public class Clarification {
 
     @ManyToOne
     private User clarificationProvidedBy;
+
     private Date clarifiedDate;
 
 
