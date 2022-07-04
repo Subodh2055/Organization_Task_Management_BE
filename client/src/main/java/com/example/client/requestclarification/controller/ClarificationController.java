@@ -52,7 +52,7 @@ public class ClarificationController {
     }
 
     @GetMapping("/find/{id}")
-    public ResponseEntity<Clarification> getClarificationById(@PathVariable("id") Long id) throws ClassNotFoundException {
+    public ResponseEntity<Clarification> getClarificationById(@PathVariable Long id) throws ClassNotFoundException {
         Clarification clarification = clarificationService.findClarificationById(id);
         return new ResponseEntity<>(clarification, HttpStatus.OK);
     }
