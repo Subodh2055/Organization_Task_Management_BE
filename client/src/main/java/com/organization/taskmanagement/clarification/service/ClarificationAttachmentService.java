@@ -2,6 +2,7 @@ package com.organization.taskmanagement.clarification.service;
 
 import com.organization.taskmanagement.clarification.dto.AttachmentDto;
 import com.organization.taskmanagement.clarification.entity.Clarification;
+import com.organization.taskmanagement.clarification.entity.ActivityType;
 import com.organization.taskmanagement.clarification.entity.ClarificationAttachment;
 import com.organization.taskmanagement.clarification.repository.ClarificationAttachmentRepository;
 import com.organization.taskmanagement.common.exception.ApiException;
@@ -25,6 +26,7 @@ public class ClarificationAttachmentService {
     private final ClarificationService clarificationService;
     private final ClarificationAttachmentRepository attachmentRepository;
     private final FileStorageService storage;
+    private final ActivityService activityService;
 
     public record Download(ClarificationAttachment attachment, Resource resource) {
     }
@@ -42,7 +44,9 @@ public class ClarificationAttachmentService {
         attachment.setSize(file.getSize());
         attachment.setStoredName(storage.store(file));
         clarification.setUpdatedAt(Instant.now());
-        return AttachmentDto.from(attachmentRepository.save(attachment));
+        attachment = attachmentRepository.save(attachment);
+        activityService.record(clarification, user, ActivityType.ATTACHMENT_ADDED, attachment.getFileName());
+        return AttachmentDto.from(attachment);
     }
 
     @Transactional(readOnly = true)
@@ -59,6 +63,7 @@ public class ClarificationAttachmentService {
         if (!user.hasRole(RoleName.ADMIN) && !attachment.getUploadedBy().getId().equals(user.getId())) {
             throw ApiException.forbidden("Only the uploader or an admin can delete this file");
         }
+        activityService.record(attachment.getClarification(), user, ActivityType.ATTACHMENT_REMOVED, attachment.getFileName());
         attachmentRepository.delete(attachment);
         storage.delete(attachment.getStoredName());
     }

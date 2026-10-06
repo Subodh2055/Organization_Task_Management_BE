@@ -1,6 +1,7 @@
 package com.organization.taskmanagement.clarification.repository;
 
 import com.organization.taskmanagement.clarification.entity.Clarification;
+import com.organization.taskmanagement.clarification.entity.ClarificationPriority;
 import com.organization.taskmanagement.clarification.entity.ClarificationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -24,12 +25,16 @@ public interface ClarificationRepository extends JpaRepository<Clarification, Lo
 
     long countByRequestedBy_IdAndStatusAndExpectedClosureDateBefore(Long userId, ClarificationStatus status, LocalDate date);
 
-    /** Pending, due on the given day, and not yet reminded. */
+    long countByStatusAndPriority(ClarificationStatus status, ClarificationPriority priority);
+
+    long countByRequestedTo_IdAndStatusAndPriority(Long userId, ClarificationStatus status, ClarificationPriority priority);
+
+    /** Pending, due within the given days (inclusive), and not yet reminded. */
     @Query("""
             select c from Clarification c
             where c.status = com.organization.taskmanagement.clarification.entity.ClarificationStatus.PENDING
-              and c.expectedClosureDate = :day and c.dueReminderSentAt is null""")
-    List<Clarification> findDueOnWithoutReminder(@Param("day") LocalDate day);
+              and c.expectedClosureDate between :from and :to and c.dueReminderSentAt is null""")
+    List<Clarification> findDueBetweenWithoutReminder(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
     /** Pending, past due, and not yet reminded. */
     @Query("""

@@ -6,8 +6,11 @@ import com.organization.taskmanagement.clarification.dto.ClarificationDto;
 import com.organization.taskmanagement.clarification.dto.ClarificationScope;
 import com.organization.taskmanagement.clarification.dto.CommentDto;
 import com.organization.taskmanagement.clarification.dto.CreateClarificationRequest;
+import com.organization.taskmanagement.clarification.dto.UpdateClarificationRequest;
+import com.organization.taskmanagement.clarification.entity.ActivityType;
 import com.organization.taskmanagement.clarification.entity.Clarification;
-import com.organization.taskmanagement.clarification.entity.ClarificationComment;
+import com.organization.taskmanagement.clarification.entity.ClarificationCategory;
+import com.organization.taskmanagement.clarification.entity.ClarificationPriority;
 import com.organization.taskmanagement.clarification.entity.ClarificationStatus;
 import com.organization.taskmanagement.clarification.repository.ClarificationAttachmentRepository;
 import com.organization.taskmanagement.clarification.repository.ClarificationCommentRepository;
@@ -29,9 +32,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
+import static com.organization.taskmanagement.clarification.repository.ClarificationSpecifications.hasCategory;
+import static com.organization.taskmanagement.clarification.repository.ClarificationSpecifications.hasPriority;
 import static com.organization.taskmanagement.clarification.repository.ClarificationSpecifications.hasStatus;
 import static com.organization.taskmanagement.clarification.repository.ClarificationSpecifications.inProject;
 import static com.organization.taskmanagement.clarification.repository.ClarificationSpecifications.matches;
@@ -44,17 +51,23 @@ import static com.organization.taskmanagement.clarification.repository.Clarifica
 @Transactional
 public class ClarificationService {
 
+    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("d MMM yyyy");
+
     private final ClarificationRepository clarificationRepository;
     private final ClarificationCommentRepository commentRepository;
     private final ClarificationAttachmentRepository attachmentRepository;
     private final ProjectService projectService;
     private final UserService userService;
     private final NotificationService notificationService;
+    private final ActivityService activityService;
+
+    public record Filters(ClarificationStatus status, boolean overdueOnly, ClarificationPriority priority,
+                          ClarificationCategory category, Long projectId, String search) {
+    }
 
     /** Search and page through the clarifications the user may see. */
     @Transactional(readOnly = true)
-    public PageResponse<ClarificationDto> search(User user, ClarificationScope scope, ClarificationStatus status,
-                                                 boolean overdueOnly, Long projectId, String search, Pageable pageable) {
+    public PageResponse<ClarificationDto> search(User user, ClarificationScope scope, Filters f, Pageable pageable) {
         boolean admin = user.hasRole(RoleName.ADMIN);
         ClarificationScope effective = scope != null ? scope : (admin ? ClarificationScope.ALL : ClarificationScope.ASSIGNED);
         if (effective == ClarificationScope.ALL && !admin) {
@@ -67,37 +80,48 @@ public class ClarificationService {
             case REQUESTED -> filters.add(requestedBy(user.getId()));
             case ALL -> { }
         }
-        if (status != null) {
-            filters.add(hasStatus(status));
+        if (f.status() != null) {
+            filters.add(hasStatus(f.status()));
         }
-        if (overdueOnly) {
+        if (f.overdueOnly()) {
             filters.add(overdue(LocalDate.now()));
         }
-        if (projectId != null) {
-            filters.add(inProject(projectId));
+        if (f.priority() != null) {
+            filters.add(hasPriority(f.priority()));
         }
-        if (search != null && !search.isBlank()) {
-            filters.add(matches(search));
+        if (f.category() != null) {
+            filters.add(hasCategory(f.category()));
+        }
+        if (f.projectId() != null) {
+            filters.add(inProject(f.projectId()));
+        }
+        if (f.search() != null && !f.search().isBlank()) {
+            filters.add(matches(f.search()));
         }
         return PageResponse.of(clarificationRepository.findAll(Specification.allOf(filters), pageable), ClarificationDto::from);
     }
 
-    /** Staff ask customers and customers ask staff, about a project the customer's organization owns. */
+    /**
+     * Staff ask customers and customers ask staff, about a project both of them belong to
+     * (see Project#admits: organization and membership rules).
+     */
     public ClarificationDto create(CreateClarificationRequest request, User requester) {
         Project project = projectService.getEntity(request.projectId());
-        User requestedTo = userService.getEntity(request.requestedToId());
-
         RoleName counterpart = requester.getRole() == null ? null : requester.getRole().counterpart();
-        if (counterpart == null || !requestedTo.hasRole(counterpart)) {
+        if (counterpart == null) {
+            throw ApiException.forbidden("Only staff and customers can raise clarifications");
+        }
+        if (!project.admits(requester)) {
+            throw ApiException.forbidden("You are not a member of this project");
+        }
+        User requestedTo = userService.getEntity(request.requestedToId());
+        if (!requestedTo.hasRole(counterpart)) {
             throw ApiException.badRequest("Staff can only ask customers, and customers can only ask staff");
         }
-        if (!requestedTo.isActive()) {
-            throw ApiException.badRequest("That user's account is deactivated");
-        }
-        User customer = requester.hasRole(RoleName.CUSTOMER) ? requester : requestedTo;
-        if (customer.getOrganization() != null
-                && !customer.getOrganization().getId().equals(project.getOrganization().getId())) {
-            throw ApiException.badRequest("The project must belong to the customer's organization");
+        if (!isCandidate(counterpart, project, requestedTo.getId())) {
+            throw ApiException.badRequest(requestedTo.isActive()
+                    ? "That person is not on this project"
+                    : "That user's account is deactivated");
         }
 
         Clarification clarification = new Clarification();
@@ -108,8 +132,13 @@ public class ClarificationService {
         clarification.setDescription(request.description().trim());
         clarification.setExpectedClosureDate(request.expectedClosureDate());
         clarification.setEmailReference(blankToNull(request.emailReference()));
+        clarification.setPriority(request.priority() == null ? ClarificationPriority.NORMAL : request.priority());
+        clarification.setCategory(request.category() == null ? ClarificationCategory.GENERAL : request.category());
         clarification = clarificationRepository.save(clarification);
 
+        activityService.record(clarification, requester, ActivityType.CREATED, "Asked %s · %s priority · %s%s".formatted(
+                requestedTo.getFullName(), clarification.getPriority().label(), clarification.getCategory().label(),
+                clarification.getExpectedClosureDate() == null ? "" : " · due " + clarification.getExpectedClosureDate().format(DATE)));
         notificationService.clarificationRequested(clarification);
         return ClarificationDto.from(clarification);
     }
@@ -122,8 +151,10 @@ public class ClarificationService {
         List<AttachmentDto> attachments = attachmentRepository.findByClarification_IdOrderByCreatedAtAsc(id).stream()
                 .map(AttachmentDto::from).toList();
         return new ClarificationDetailDto(ClarificationDto.from(clarification), comments, attachments,
+                activityService.history(id),
                 canAnswer(clarification, user), canParticipate(clarification, user),
-                canReassign(clarification, user), canReopen(clarification, user));
+                canReassign(clarification, user), canReopen(clarification, user),
+                canEditClassification(clarification, user), canChangeDueDate(clarification, user));
     }
 
     /** Only the user the clarification was asked of can answer, and only once. */
@@ -142,11 +173,60 @@ public class ClarificationService {
         clarification.setUpdatedAt(now);
         clarification.setStatus(ClarificationStatus.CLOSED);
 
+        activityService.record(clarification, user, ActivityType.ANSWERED, null);
         notificationService.clarificationAnswered(clarification);
         return ClarificationDto.from(clarification);
     }
 
-    /** Who a pending clarification can be handed to: the same kind of user as the current assignee. */
+    /**
+     * Changes priority, category or due date of a pending clarification. Priority and category:
+     * requester, assignee or admin. Due date: requester or admin. Each change goes into the history,
+     * and the assignee is told when someone else changed it.
+     */
+    public ClarificationDto update(Long id, UpdateClarificationRequest request, User actor) {
+        Clarification clarification = getViewable(id, actor);
+        if (clarification.getStatus() != ClarificationStatus.PENDING) {
+            throw ApiException.conflict("Answered clarifications cannot be changed; reopen it first");
+        }
+        List<String> changes = new ArrayList<>();
+
+        if (request.priority() != null && request.priority() != clarification.getPriority()) {
+            requireClassificationRights(clarification, actor);
+            String change = "%s → %s".formatted(clarification.getPriority().label(), request.priority().label());
+            clarification.setPriority(request.priority());
+            activityService.record(clarification, actor, ActivityType.PRIORITY_CHANGED, change);
+            changes.add("priority " + change);
+        }
+        if (request.category() != null && request.category() != clarification.getCategory()) {
+            requireClassificationRights(clarification, actor);
+            String change = "%s → %s".formatted(clarification.getCategory().label(), request.category().label());
+            clarification.setCategory(request.category());
+            activityService.record(clarification, actor, ActivityType.CATEGORY_CHANGED, change);
+            changes.add("category " + change);
+        }
+        LocalDate newDue = Boolean.TRUE.equals(request.clearDueDate()) ? null
+                : request.expectedClosureDate() != null ? request.expectedClosureDate() : clarification.getExpectedClosureDate();
+        if (!Objects.equals(newDue, clarification.getExpectedClosureDate())) {
+            if (!canChangeDueDate(clarification, actor)) {
+                throw ApiException.forbidden("Only the requester or an admin can change the due date");
+            }
+            String change = "%s → %s".formatted(formatDate(clarification.getExpectedClosureDate()), formatDate(newDue));
+            clarification.setExpectedClosureDate(newDue);
+            clarification.resetReminders();
+            activityService.record(clarification, actor, ActivityType.DUE_DATE_CHANGED, change);
+            changes.add("due date " + change);
+        }
+
+        if (!changes.isEmpty()) {
+            clarification.setUpdatedAt(Instant.now());
+            if (!actor.getId().equals(clarification.getRequestedTo().getId())) {
+                notificationService.clarificationUpdated(clarification, actor, String.join(", ", changes));
+            }
+        }
+        return ClarificationDto.from(clarification);
+    }
+
+    /** Who a pending clarification can be handed to: other project members of the assignee's role. */
     @Transactional(readOnly = true)
     public List<UserSummary> reassignCandidates(Long id, User user) {
         Clarification clarification = getViewable(id, user);
@@ -154,15 +234,12 @@ public class ClarificationService {
             throw ApiException.forbidden("You cannot reassign this clarification");
         }
         Long currentAssignee = clarification.getRequestedTo().getId();
-        return userService.findAssignable(clarification.getRequestedBy(), clarification.getProject().getId()).stream()
+        return userService.candidatesFor(assigneeRole(clarification), clarification.getProject()).stream()
                 .filter(candidate -> !candidate.id().equals(currentAssignee))
                 .toList();
     }
 
-    /**
-     * Hands a pending clarification to someone else. The assignee, the requester or an admin can do it;
-     * the new person must be someone the requester could have asked about this project.
-     */
+    /** The requester, the assignee or an admin hands a pending clarification to another eligible person. */
     public ClarificationDto reassign(Long id, Long newAssigneeId, String note, User actor) {
         Clarification clarification = getViewable(id, actor);
         if (!canReassign(clarification, actor)) {
@@ -174,9 +251,7 @@ public class ClarificationService {
         if (previous.getId().equals(newAssigneeId)) {
             throw ApiException.badRequest("It is already assigned to that person");
         }
-        boolean allowed = userService.findAssignable(clarification.getRequestedBy(), clarification.getProject().getId())
-                .stream().anyMatch(candidate -> candidate.id().equals(newAssigneeId));
-        if (!allowed) {
+        if (!isCandidate(assigneeRole(clarification), clarification.getProject(), newAssigneeId)) {
             throw ApiException.badRequest("That person cannot be asked about this project");
         }
         User next = userService.getEntity(newAssigneeId);
@@ -185,15 +260,15 @@ public class ClarificationService {
         clarification.resetReminders();
 
         String cleanNote = blankToNull(note);
-        addSystemComment(clarification, actor, "Reassigned from %s to %s.%s".formatted(
-                previous.getFullName(), next.getFullName(), cleanNote == null ? "" : "\n\n" + cleanNote));
+        activityService.record(clarification, actor, ActivityType.REASSIGNED, "From %s to %s%s".formatted(
+                previous.getFullName(), next.getFullName(), cleanNote == null ? "" : "\nNote: " + cleanNote));
         notificationService.clarificationReassigned(clarification, actor, previous, cleanNote);
         return ClarificationDto.from(clarification);
     }
 
     /**
      * The requester (or an admin) reopens an answered clarification when the answer does not settle it.
-     * The previous answer is kept in the discussion so nothing is lost.
+     * The reason and the previous answer are kept in the history.
      */
     public ClarificationDto reopen(Long id, String reason, User actor) {
         Clarification clarification = getViewable(id, actor);
@@ -202,10 +277,10 @@ public class ClarificationService {
                     ? "This clarification is still open"
                     : "Only the requester or an admin can reopen this clarification");
         }
-        String previousAnswer = "Previous answer from %s:\n%s".formatted(
+        activityService.record(clarification, actor, ActivityType.REOPENED, "Reason: %s\nPrevious answer from %s: %s".formatted(
+                reason.trim(),
                 clarification.getAnsweredBy() == null ? "unknown" : clarification.getAnsweredBy().getFullName(),
-                clarification.getAnswer());
-        addSystemComment(clarification, actor, "Reopened: %s\n\n%s".formatted(reason.trim(), previousAnswer));
+                clarification.getAnswer()));
 
         clarification.setStatus(ClarificationStatus.PENDING);
         clarification.setAnswer(null);
@@ -249,13 +324,34 @@ public class ClarificationService {
                 && (user.hasRole(RoleName.ADMIN) || clarification.getRequestedBy().getId().equals(user.getId()));
     }
 
-    /** Records reassign/reopen in the discussion so the history stays visible. */
-    private void addSystemComment(Clarification clarification, User author, String body) {
-        ClarificationComment comment = new ClarificationComment();
-        comment.setClarification(clarification);
-        comment.setAuthor(author);
-        comment.setBody(body.length() > 4000 ? body.substring(0, 3997) + "..." : body);
-        commentRepository.save(comment);
+    private boolean canEditClassification(Clarification clarification, User user) {
+        return clarification.getStatus() == ClarificationStatus.PENDING
+                && (user.hasRole(RoleName.ADMIN) || clarification.isParticipant(user));
+    }
+
+    private boolean canChangeDueDate(Clarification clarification, User user) {
+        return clarification.getStatus() == ClarificationStatus.PENDING
+                && (user.hasRole(RoleName.ADMIN) || clarification.getRequestedBy().getId().equals(user.getId()));
+    }
+
+    private void requireClassificationRights(Clarification clarification, User user) {
+        if (!canEditClassification(clarification, user)) {
+            throw ApiException.forbidden("You cannot change this clarification");
+        }
+    }
+
+    /** The role the clarification is asked of: the other side from the requester. */
+    private static RoleName assigneeRole(Clarification clarification) {
+        RoleName requesterRole = clarification.getRequestedBy().getRole();
+        return requesterRole == null ? RoleName.STAFF : requesterRole.counterpart();
+    }
+
+    private boolean isCandidate(RoleName role, Project project, Long userId) {
+        return userService.candidatesFor(role, project).stream().anyMatch(candidate -> candidate.id().equals(userId));
+    }
+
+    private static String formatDate(LocalDate date) {
+        return date == null ? "none" : date.format(DATE);
     }
 
     private static String blankToNull(String value) {

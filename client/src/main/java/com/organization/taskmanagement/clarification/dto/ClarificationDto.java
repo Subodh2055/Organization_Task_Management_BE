@@ -1,6 +1,8 @@
 package com.organization.taskmanagement.clarification.dto;
 
 import com.organization.taskmanagement.clarification.entity.Clarification;
+import com.organization.taskmanagement.clarification.entity.ClarificationCategory;
+import com.organization.taskmanagement.clarification.entity.ClarificationPriority;
 import com.organization.taskmanagement.clarification.entity.ClarificationStatus;
 import com.organization.taskmanagement.project.dto.ProjectDto;
 import com.organization.taskmanagement.user.dto.UserSummary;
@@ -16,6 +18,8 @@ public record ClarificationDto(
         UserSummary requestedBy,
         UserSummary requestedTo,
         ClarificationStatus status,
+        ClarificationPriority priority,
+        ClarificationCategory category,
         LocalDate expectedClosureDate,
         String emailReference,
         String answer,
@@ -28,6 +32,7 @@ public record ClarificationDto(
     public static ClarificationDto from(Clarification c) {
         return new ClarificationDto(c.getId(), c.getSubject(), c.getDescription(), ProjectDto.from(c.getProject()),
                 UserSummary.from(c.getRequestedBy()), UserSummary.from(c.getRequestedTo()), c.getStatus(),
+                c.getPriority(), c.getCategory(),
                 c.getExpectedClosureDate(), c.getEmailReference(), c.getAnswer(), UserSummary.from(c.getAnsweredBy()),
                 c.getAnsweredAt(), c.getCreatedAt(), c.getUpdatedAt(), c.isOverdue(LocalDate.now()));
     }

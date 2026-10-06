@@ -54,6 +54,16 @@ public class Clarification {
     @Column(nullable = false, length = 20)
     private ClarificationStatus status = ClarificationStatus.PENDING;
 
+    /** Null only on rows created before priorities existed; read as NORMAL. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private ClarificationPriority priority = ClarificationPriority.NORMAL;
+
+    /** Null only on rows created before categories existed; read as GENERAL. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private ClarificationCategory category = ClarificationCategory.GENERAL;
+
     private LocalDate expectedClosureDate;
 
     private String emailReference;
@@ -89,6 +99,14 @@ public class Clarification {
         if (updatedAt == null) {
             updatedAt = now;
         }
+    }
+
+    public ClarificationPriority getPriority() {
+        return priority == null ? ClarificationPriority.NORMAL : priority;
+    }
+
+    public ClarificationCategory getCategory() {
+        return category == null ? ClarificationCategory.GENERAL : category;
     }
 
     /** Still pending after its expected closure date. */

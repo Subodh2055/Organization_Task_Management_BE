@@ -84,8 +84,9 @@ public class UserService {
     }
 
     /**
-     * Who the current user can raise a clarification to. Staff ask customers of the project's
-     * organization; customers ask any active staff member.
+     * Who the current user can raise a clarification to about a project: active users of the
+     * other role (staff ask customers, customers ask staff) whom the project admits. A project
+     * with members of that role admits only those members. Empty if the user may not use the project.
      */
     @Transactional(readOnly = true)
     public List<UserSummary> findAssignable(User user, Long projectId) {
@@ -93,13 +94,24 @@ public class UserService {
         if (counterpart == null) {
             return List.of();
         }
-        Long organizationId = null;
-        if (counterpart == RoleName.CUSTOMER && projectId != null) {
-            Project project = projectService.getEntity(projectId);
-            organizationId = project.getOrganization().getId();
+        if (projectId == null) {
+            return userRepository.findActiveByRole(counterpart.authority(), null).stream().map(UserSummary::from).toList();
         }
-        return userRepository.findActiveByRole(counterpart.authority(), organizationId).stream()
-                .map(UserSummary::from).toList();
+        Project project = projectService.getEntity(projectId);
+        if (!project.admits(user)) {
+            return List.of();
+        }
+        return candidatesFor(counterpart, project);
+    }
+
+    /** Active users of a role whom the project admits (members, or anyone eligible if it has none of that role). */
+    @Transactional(readOnly = true)
+    public List<UserSummary> candidatesFor(RoleName role, Project project) {
+        Long organizationId = role == RoleName.CUSTOMER ? project.getOrganization().getId() : null;
+        return userRepository.findActiveByRole(role.authority(), organizationId).stream()
+                .filter(project::admits)
+                .map(UserSummary::from)
+                .toList();
     }
 
     public void ensureAvailable(String userName, String email) {

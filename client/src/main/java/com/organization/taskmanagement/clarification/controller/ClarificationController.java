@@ -7,6 +7,10 @@ import com.organization.taskmanagement.clarification.dto.ClarificationScope;
 import com.organization.taskmanagement.clarification.dto.CreateClarificationRequest;
 import com.organization.taskmanagement.clarification.dto.ReassignRequest;
 import com.organization.taskmanagement.clarification.dto.ReopenRequest;
+import com.organization.taskmanagement.clarification.dto.UpdateClarificationRequest;
+import com.organization.taskmanagement.clarification.entity.ClarificationCategory;
+import com.organization.taskmanagement.clarification.entity.ClarificationPriority;
+import org.springframework.web.bind.annotation.PatchMapping;
 import com.organization.taskmanagement.user.dto.UserSummary;
 import com.organization.taskmanagement.clarification.entity.ClarificationStatus;
 import com.organization.taskmanagement.clarification.service.ClarificationService;
@@ -40,18 +44,27 @@ public class ClarificationController {
 
     /**
      * Paged, newest activity first. scope: ALL (admin), ASSIGNED (asked of me) or REQUESTED (asked by me);
-     * optional status, overdue (pending past its due date), projectId and free-text search.
+     * optional status, overdue (pending past its due date), priority, category, projectId and free-text search.
      */
     @GetMapping
     public PageResponse<ClarificationDto> search(@RequestParam(required = false) ClarificationScope scope,
                                                  @RequestParam(required = false) ClarificationStatus status,
                                                  @RequestParam(defaultValue = "false") boolean overdue,
+                                                 @RequestParam(required = false) ClarificationPriority priority,
+                                                 @RequestParam(required = false) ClarificationCategory category,
                                                  @RequestParam(required = false) Long projectId,
                                                  @RequestParam(required = false) String search,
                                                  @PageableDefault(size = 10, sort = "updatedAt", direction = Sort.Direction.DESC) Pageable pageable,
                                                  Authentication authentication) {
-        return clarificationService.search(userService.currentUser(authentication), scope, status, overdue, projectId,
-                search, pageable);
+        return clarificationService.search(userService.currentUser(authentication), scope,
+                new ClarificationService.Filters(status, overdue, priority, category, projectId, search), pageable);
+    }
+
+    /** Change priority, category or due date of a pending clarification. Null fields are left as they are. */
+    @PatchMapping("/{id}")
+    public ClarificationDto update(@PathVariable Long id, @Valid @RequestBody UpdateClarificationRequest request,
+                                   Authentication authentication) {
+        return clarificationService.update(id, request, userService.currentUser(authentication));
     }
 
     /** Staff or customer raises a clarification; the requester and date are set by the server. */

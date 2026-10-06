@@ -1,5 +1,6 @@
 package com.organization.taskmanagement.dashboard.service;
 
+import com.organization.taskmanagement.clarification.entity.ClarificationPriority;
 import com.organization.taskmanagement.clarification.entity.ClarificationStatus;
 import com.organization.taskmanagement.clarification.repository.ClarificationRepository;
 import com.organization.taskmanagement.dashboard.dto.DashboardDto;
@@ -36,9 +37,12 @@ public class DashboardService {
             counts.put("customers", userRepository.countByRoles_Name(RoleName.CUSTOMER.authority()));
             counts.put("pending", clarificationRepository.countByStatus(ClarificationStatus.PENDING));
             counts.put("overdue", clarificationRepository.countByStatusAndExpectedClosureDateBefore(ClarificationStatus.PENDING, today));
+            counts.put("urgent", clarificationRepository.countByStatusAndPriority(ClarificationStatus.PENDING, ClarificationPriority.URGENT));
             counts.put("closed", clarificationRepository.countByStatus(ClarificationStatus.CLOSED));
         } else {
-            counts.put("assignedOverdue", clarificationRepository.countByRequestedTo_IdAndStatusAndExpectedClosureDateBefore(
+            counts.put("assignedUrgent", clarificationRepository.countByRequestedTo_IdAndStatusAndPriority(
+                    user.getId(), ClarificationStatus.PENDING, ClarificationPriority.URGENT));
+            counts.put("assignedOverdue",clarificationRepository.countByRequestedTo_IdAndStatusAndExpectedClosureDateBefore(
                     user.getId(), ClarificationStatus.PENDING, today));
             counts.put("requestedOverdue", clarificationRepository.countByRequestedBy_IdAndStatusAndExpectedClosureDateBefore(
                     user.getId(), ClarificationStatus.PENDING, today));

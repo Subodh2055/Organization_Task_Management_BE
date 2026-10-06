@@ -65,6 +65,7 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         // Admin only.
                         .requestMatchers(HttpMethod.POST, "/api/organizations", "/api/projects").hasRole("ADMIN")
+                        .requestMatchers("/api/projects/*/members", "/api/projects/*/members/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/users").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/users").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/users/*/status").hasRole("ADMIN")

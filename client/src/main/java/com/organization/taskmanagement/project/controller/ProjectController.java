@@ -1,14 +1,18 @@
 package com.organization.taskmanagement.project.controller;
 
+import com.organization.taskmanagement.project.dto.AddMemberRequest;
 import com.organization.taskmanagement.project.dto.ProjectDto;
 import com.organization.taskmanagement.project.dto.ProjectRequest;
 import com.organization.taskmanagement.project.service.ProjectService;
+import com.organization.taskmanagement.user.dto.UserSummary;
 import com.organization.taskmanagement.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,5 +40,23 @@ public class ProjectController {
     @ResponseStatus(HttpStatus.CREATED)
     public ProjectDto create(@Valid @RequestBody ProjectRequest request) {
         return projectService.create(request);
+    }
+
+    /** Admin only. */
+    @GetMapping("/{id}/members")
+    public List<UserSummary> members(@PathVariable Long id) {
+        return projectService.members(id);
+    }
+
+    /** Admin only. Returns the updated member list. */
+    @PostMapping("/{id}/members")
+    public List<UserSummary> addMember(@PathVariable Long id, @Valid @RequestBody AddMemberRequest request) {
+        return projectService.addMember(id, request.userId());
+    }
+
+    /** Admin only. Returns the updated member list. */
+    @DeleteMapping("/{id}/members/{userId}")
+    public List<UserSummary> removeMember(@PathVariable Long id, @PathVariable Long userId) {
+        return projectService.removeMember(id, userId);
     }
 }

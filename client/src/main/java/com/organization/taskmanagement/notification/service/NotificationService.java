@@ -31,11 +31,19 @@ public class NotificationService {
 
     public void clarificationRequested(Clarification c) {
         notify(c.getRequestedTo(), NotificationType.CLARIFICATION_REQUESTED, c,
-                "%s asked you: %s".formatted(c.getRequestedBy().getFullName(), c.getSubject()),
-                "New clarification request: " + c.getSubject(),
-                "%s asked you for a clarification on project %s.\n\nSubject: %s\n\n%s%s".formatted(
-                        c.getRequestedBy().getFullName(), c.getProject().getName(), c.getSubject(), c.getDescription(),
-                        dueLine(c)));
+                "%s%s asked you: %s".formatted(priorityTag(c), c.getRequestedBy().getFullName(), c.getSubject()),
+                priorityTag(c) + "New clarification request: " + c.getSubject(),
+                "%s asked you for a clarification on project %s.\n\nSubject: %s\nPriority: %s\nCategory: %s\n\n%s%s".formatted(
+                        c.getRequestedBy().getFullName(), c.getProject().getName(), c.getSubject(),
+                        c.getPriority().label(), c.getCategory().label(), c.getDescription(), dueLine(c)));
+    }
+
+    /** Priority, category or due date changed by someone other than the assignee. */
+    public void clarificationUpdated(Clarification c, User actor, String changes) {
+        notify(c.getRequestedTo(), NotificationType.CLARIFICATION_UPDATED, c,
+                "%s changed %s: %s".formatted(actor.getFullName(), changes, c.getSubject()),
+                "Clarification updated: " + c.getSubject(),
+                "%s changed \"%s\": %s.".formatted(actor.getFullName(), c.getSubject(), changes));
     }
 
     public void clarificationAnswered(Clarification c) {
@@ -80,10 +88,11 @@ public class NotificationService {
                 "%s reopened \"%s\" and needs a new answer.\n\nReason: %s".formatted(actor.getFullName(), c.getSubject(), reason));
     }
 
-    public void dueSoon(Clarification c) {
+    /** whenText: "today", "tomorrow" or "in 2 days". */
+    public void dueSoon(Clarification c, String whenText) {
         notify(c.getRequestedTo(), NotificationType.DUE_SOON, c,
-                "Due tomorrow: %s".formatted(c.getSubject()),
-                "Reminder: clarification due tomorrow: " + c.getSubject(),
+                "%sDue %s: %s".formatted(priorityTag(c), whenText, c.getSubject()),
+                "Reminder: clarification due %s: %s".formatted(whenText, c.getSubject()),
                 "\"%s\" from %s is due on %s and still needs your answer.".formatted(
                         c.getSubject(), c.getRequestedBy().getFullName(), c.getExpectedClosureDate().format(DATE)));
     }
@@ -144,6 +153,14 @@ public class NotificationService {
             }
         }
         return recipients;
+    }
+
+    /** "[Urgent] " or "[High] " in front of messages; nothing for normal and low. */
+    private static String priorityTag(Clarification c) {
+        return switch (c.getPriority()) {
+            case URGENT, HIGH -> "[" + c.getPriority().label() + "] ";
+            default -> "";
+        };
     }
 
     private static String dueLine(Clarification c) {

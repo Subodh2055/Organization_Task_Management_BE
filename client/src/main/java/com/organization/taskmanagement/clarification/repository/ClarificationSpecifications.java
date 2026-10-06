@@ -1,6 +1,8 @@
 package com.organization.taskmanagement.clarification.repository;
 
 import com.organization.taskmanagement.clarification.entity.Clarification;
+import com.organization.taskmanagement.clarification.entity.ClarificationCategory;
+import com.organization.taskmanagement.clarification.entity.ClarificationPriority;
 import com.organization.taskmanagement.clarification.entity.ClarificationStatus;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -26,6 +28,19 @@ public final class ClarificationSpecifications {
 
     public static Specification<Clarification> inProject(Long projectId) {
         return (root, query, cb) -> cb.equal(root.get("project").get("id"), projectId);
+    }
+
+    public static Specification<Clarification> hasPriority(ClarificationPriority priority) {
+        return (root, query, cb) -> priority == ClarificationPriority.NORMAL
+                // Rows from before priorities existed have no value and count as NORMAL.
+                ? cb.or(cb.equal(root.get("priority"), priority), cb.isNull(root.get("priority")))
+                : cb.equal(root.get("priority"), priority);
+    }
+
+    public static Specification<Clarification> hasCategory(ClarificationCategory category) {
+        return (root, query, cb) -> category == ClarificationCategory.GENERAL
+                ? cb.or(cb.equal(root.get("category"), category), cb.isNull(root.get("category")))
+                : cb.equal(root.get("category"), category);
     }
 
     /** Still pending after its expected closure date. */
