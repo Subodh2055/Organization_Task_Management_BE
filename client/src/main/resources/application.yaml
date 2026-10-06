@@ -49,3 +49,6 @@ app:
     location: ${STORAGE_LOCATION:./uploads}
   password-reset:
     expiration-minutes: ${PASSWORD_RESET_EXPIRATION_MINUTES:60}
+  reminders:
+    # When due-tomorrow and overdue reminders are sent (Spring cron: sec min hour day month weekday).
+    cron: ${REMINDERS_CRON:0 0 8 * * *}

@@ -74,6 +74,12 @@ public class Clarification {
     @Column(nullable = false)
     private Instant updatedAt;
 
+    /** When the "due tomorrow" reminder went out; cleared on reassign/reopen so the next owner gets one. */
+    private Instant dueReminderSentAt;
+
+    /** When the "overdue" reminder went out; cleared on reassign/reopen. */
+    private Instant overdueReminderSentAt;
+
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();
@@ -83,6 +89,16 @@ public class Clarification {
         if (updatedAt == null) {
             updatedAt = now;
         }
+    }
+
+    /** Still pending after its expected closure date. */
+    public boolean isOverdue(LocalDate today) {
+        return status == ClarificationStatus.PENDING && expectedClosureDate != null && expectedClosureDate.isBefore(today);
+    }
+
+    public void resetReminders() {
+        dueReminderSentAt = null;
+        overdueReminderSentAt = null;
     }
 
     public boolean isParticipant(User user) {

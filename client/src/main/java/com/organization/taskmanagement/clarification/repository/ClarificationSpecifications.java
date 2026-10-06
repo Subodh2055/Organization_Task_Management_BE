@@ -4,6 +4,8 @@ import com.organization.taskmanagement.clarification.entity.Clarification;
 import com.organization.taskmanagement.clarification.entity.ClarificationStatus;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.LocalDate;
+
 /** Building blocks for the clarification list filters. */
 public final class ClarificationSpecifications {
 
@@ -24,6 +26,13 @@ public final class ClarificationSpecifications {
 
     public static Specification<Clarification> inProject(Long projectId) {
         return (root, query, cb) -> cb.equal(root.get("project").get("id"), projectId);
+    }
+
+    /** Still pending after its expected closure date. */
+    public static Specification<Clarification> overdue(LocalDate today) {
+        return (root, query, cb) -> cb.and(
+                cb.equal(root.get("status"), ClarificationStatus.PENDING),
+                cb.lessThan(root.get("expectedClosureDate"), today));
     }
 
     /** Case-insensitive match on subject, description or answer. */

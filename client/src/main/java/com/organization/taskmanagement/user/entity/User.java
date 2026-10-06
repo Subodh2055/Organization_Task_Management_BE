@@ -60,6 +60,9 @@ public class User {
     @Column(nullable = false)
     private boolean active = true;
 
+    /** Email copies of notifications. Null (older rows) means on. */
+    private Boolean emailNotifications = true;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -83,5 +86,9 @@ public class User {
 
     public boolean hasRole(RoleName roleName) {
         return roleName == getRole();
+    }
+
+    public boolean wantsEmailNotifications() {
+        return !Boolean.FALSE.equals(emailNotifications);
     }
 }

@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -26,6 +27,7 @@ public class DashboardService {
     private final ClarificationRepository clarificationRepository;
 
     public DashboardDto forUser(User user) {
+        LocalDate today = LocalDate.now();
         Map<String, Long> counts = new LinkedHashMap<>();
         if (user.hasRole(RoleName.ADMIN)) {
             counts.put("organizations", organizationRepository.count());
@@ -33,8 +35,13 @@ public class DashboardService {
             counts.put("staff", userRepository.countByRoles_Name(RoleName.STAFF.authority()));
             counts.put("customers", userRepository.countByRoles_Name(RoleName.CUSTOMER.authority()));
             counts.put("pending", clarificationRepository.countByStatus(ClarificationStatus.PENDING));
+            counts.put("overdue", clarificationRepository.countByStatusAndExpectedClosureDateBefore(ClarificationStatus.PENDING, today));
             counts.put("closed", clarificationRepository.countByStatus(ClarificationStatus.CLOSED));
         } else {
+            counts.put("assignedOverdue", clarificationRepository.countByRequestedTo_IdAndStatusAndExpectedClosureDateBefore(
+                    user.getId(), ClarificationStatus.PENDING, today));
+            counts.put("requestedOverdue", clarificationRepository.countByRequestedBy_IdAndStatusAndExpectedClosureDateBefore(
+                    user.getId(), ClarificationStatus.PENDING, today));
             counts.put("assignedPending", clarificationRepository.countByRequestedTo_IdAndStatus(user.getId(), ClarificationStatus.PENDING));
             counts.put("assignedClosed", clarificationRepository.countByRequestedTo_IdAndStatus(user.getId(), ClarificationStatus.CLOSED));
             counts.put("requestedPending", clarificationRepository.countByRequestedBy_IdAndStatus(user.getId(), ClarificationStatus.PENDING));

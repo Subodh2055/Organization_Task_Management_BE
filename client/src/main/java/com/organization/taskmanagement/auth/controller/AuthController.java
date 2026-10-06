@@ -5,6 +5,7 @@ import com.organization.taskmanagement.auth.dto.AvailabilityResponse;
 import com.organization.taskmanagement.auth.dto.ChangePasswordRequest;
 import com.organization.taskmanagement.auth.dto.ForgotPasswordRequest;
 import com.organization.taskmanagement.auth.dto.LoginRequest;
+import com.organization.taskmanagement.auth.dto.PreferencesRequest;
 import com.organization.taskmanagement.auth.dto.RegisterRequest;
 import com.organization.taskmanagement.auth.dto.ResetPasswordRequest;
 import com.organization.taskmanagement.auth.service.AuthService;
@@ -17,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -53,6 +55,12 @@ public class AuthController {
     public AvailabilityResponse availability(@RequestParam(required = false) String userName,
                                              @RequestParam(required = false) String email) {
         return authService.availability(userName, email);
+    }
+
+    /** The current user's settings, e.g. whether notifications are also emailed. */
+    @PutMapping("/preferences")
+    public UserDto updatePreferences(@Valid @RequestBody PreferencesRequest request, Authentication authentication) {
+        return authService.updatePreferences(userService.currentUser(authentication), request.emailNotifications());
     }
 
     @PostMapping("/change-password")

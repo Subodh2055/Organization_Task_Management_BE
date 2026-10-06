@@ -83,6 +83,12 @@ public class AuthService {
         return new AvailabilityResponse(userNameTaken, emailTaken);
     }
 
+    public UserDto updatePreferences(User user, boolean emailNotifications) {
+        User managed = userService.getEntity(user.getId());
+        managed.setEmailNotifications(emailNotifications);
+        return UserDto.from(managed);
+    }
+
     public void changePassword(User user, String currentPassword, String newPassword) {
         if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
             throw ApiException.badRequest("Current password is incorrect");

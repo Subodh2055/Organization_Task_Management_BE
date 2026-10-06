@@ -17,11 +17,12 @@ public record UserDto(
         String userName,
         RoleName role,
         boolean active,
+        boolean emailNotifications,
         Instant createdAt) {
 
     public static UserDto from(User user) {
         return new UserDto(user.getId(), user.getFullName(), user.getDesignation(),
                 OrganizationSummary.from(user.getOrganization()), user.getEmail(), user.getMobile(),
-                user.getUserName(), user.getRole(), user.isActive(), user.getCreatedAt());
+                user.getUserName(), user.getRole(), user.isActive(), user.wantsEmailNotifications(), user.getCreatedAt());
     }
 }

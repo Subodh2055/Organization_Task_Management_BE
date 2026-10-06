@@ -8,5 +8,7 @@ public record ClarificationDetailDto(
         List<CommentDto> comments,
         List<AttachmentDto> attachments,
         boolean canAnswer,
-        boolean canParticipate) {
+        boolean canParticipate,
+        boolean canReassign,
+        boolean canReopen) {
 }

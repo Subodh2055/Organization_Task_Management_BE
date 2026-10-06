@@ -22,12 +22,13 @@ public record ClarificationDto(
         UserSummary answeredBy,
         Instant answeredAt,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        boolean overdue) {
 
     public static ClarificationDto from(Clarification c) {
         return new ClarificationDto(c.getId(), c.getSubject(), c.getDescription(), ProjectDto.from(c.getProject()),
                 UserSummary.from(c.getRequestedBy()), UserSummary.from(c.getRequestedTo()), c.getStatus(),
                 c.getExpectedClosureDate(), c.getEmailReference(), c.getAnswer(), UserSummary.from(c.getAnsweredBy()),
-                c.getAnsweredAt(), c.getCreatedAt(), c.getUpdatedAt());
+                c.getAnsweredAt(), c.getCreatedAt(), c.getUpdatedAt(), c.isOverdue(LocalDate.now()));
     }
 }
