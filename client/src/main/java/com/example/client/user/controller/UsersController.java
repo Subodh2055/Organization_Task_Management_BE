@@ -1,11 +1,13 @@
 package com.example.client.user.controller;
 
-import com.example.client.requestclarification.model.Clarification;
-import com.example.client.user.model.User;
+import com.example.client.user.dto.CreateUserDto;
+import com.example.client.user.dto.UserDto;
 import com.example.client.user.service.UserService;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,30 +18,21 @@ import java.util.List;
 public class UsersController {
     private final UserService userService;
 
-    @GetMapping("/findByEmail/{email}")
-    public ResponseEntity<User> findCustomerByEmail(@PathVariable String email){
-        User userEmail = userService.findByEmail(email);
-        return new ResponseEntity<>(userEmail, HttpStatus.OK);
+    /** Admin: every user. */
+    @GetMapping("/all")
+    public ResponseEntity<List<UserDto>> getAllUsers() {
+        return new ResponseEntity<>(userService.findAllUsers(), HttpStatus.OK);
     }
 
-    @GetMapping("/findByUserName/{userName}")
-    public ResponseEntity<User> findCustomerByUserName(@PathVariable String userName){
-        User userName1 = userService.findByUserName(userName);
-        return new ResponseEntity<>(userName1, HttpStatus.OK);
+    /** Admin: create a user with any role. */
+    @PostMapping("/add")
+    public ResponseEntity<UserDto> addUser(@Valid @RequestBody CreateUserDto createUserDto){
+        return new ResponseEntity<>(userService.createUser(createUserDto), HttpStatus.CREATED);
     }
 
-
-//    @PostMapping("/add")
-//    public ResponseEntity<User> addUser(@RequestBody User user){
-//        User newUser = userService.addUser(user);
-//        return new ResponseEntity<>(newUser, HttpStatus.CREATED);
-//    }
-
-    @RequestMapping("/all")
-    public ResponseEntity<List<User>> getAllUsers() {
-        List<User> users = userService.findAllUsers();
-        return new ResponseEntity<>(users, HttpStatus.OK);
-
-
+    /** Staff see customers and customers see staff: the people they can raise a clarification to. */
+    @GetMapping("/assignable")
+    public ResponseEntity<List<UserDto>> getAssignableUsers(Authentication authentication) {
+        return new ResponseEntity<>(userService.findAssignableUsers(userService.currentUser(authentication)), HttpStatus.OK);
     }
 }

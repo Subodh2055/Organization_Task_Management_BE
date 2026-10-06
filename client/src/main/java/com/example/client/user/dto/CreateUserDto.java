@@ -3,20 +3,17 @@ package com.example.client.user.dto;
 import com.example.client.organization.model.Organization;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
-/** Public sign-up: always creates a CUSTOMER account. */
+/** Admin-created account: the admin chooses the role (ADMIN, STAFF or CUSTOMER). */
 @Data
-public class SignUpDto {
+public class CreateUserDto {
 
     @NotBlank(message = "Full name is required")
     private String fullName;
     @NotBlank(message = "Designation is required")
     private String designation;
-
-    @NotNull(message = "Organization is required")
     private Organization organizationName;
     @NotBlank(message = "Email is required")
     @Email(message = "Email is not valid")
@@ -28,7 +25,6 @@ public class SignUpDto {
     @NotBlank(message = "Password is required")
     @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;
-    private String passwordConfirm;
-
-
+    @NotBlank(message = "Role is required")
+    private String role;
 }

@@ -9,3 +9,15 @@ spring:
       ddl-auto: update
     open-in-view: false
     show-sql: true
+
+app:
+  jwt:
+    # HMAC secret for signing login tokens, at least 32 characters. If empty, a random
+    # secret is generated at startup and everyone is logged out on every restart.
+    secret: ${JWT_SECRET:}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}
+  admin:
+    # The first ADMIN account is created at startup when no admin exists and a password is set.
+    username: ${ADMIN_USERNAME:admin}
+    email: ${ADMIN_EMAIL:admin@example.com}
+    password: ${ADMIN_PASSWORD:}

@@ -5,7 +5,7 @@ import com.example.client.clarificationtable.repository.ClarificationTableReposi
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import javax.transaction.Transactional;
+import jakarta.transaction.Transactional;
 import java.util.List;
 
 @Service

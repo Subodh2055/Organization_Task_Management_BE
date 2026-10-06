@@ -3,8 +3,8 @@ package com.example.client.organization.model;
 import com.example.client.projectcreation.model.ProjectCreation;
 import lombok.*;
 
-import javax.persistence.*;
-import javax.validation.constraints.Email;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
 import java.util.List;
 
 

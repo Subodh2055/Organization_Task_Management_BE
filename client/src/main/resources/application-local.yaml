@@ -1,0 +1,7 @@
+# Local development against PostgreSQL. Activate with --spring.profiles.active=local
+# and set LOCAL_DB_PASSWORD in the environment.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/${LOCAL_DB_NAME:client_db}
+    username: ${LOCAL_DB_USERNAME:postgres}
+    password: ${LOCAL_DB_PASSWORD}

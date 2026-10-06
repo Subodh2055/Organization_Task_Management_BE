@@ -1,59 +1,64 @@
 package com.example.client.requestclarification.controller;
 
 import com.example.client.requestclarification.model.Clarification;
-import com.example.client.requestclarification.repository.ClarificationRepository;
 import com.example.client.requestclarification.service.ClarificationService;
+import com.example.client.user.model.User;
+import com.example.client.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/clarification")
 public class ClarificationController {
 
-    private final ClarificationRepository clarificationRepository;
-
     private final ClarificationService clarificationService;
 
+    private final UserService userService;
+
+    /** Staff or customer raises a clarification; the requester and date are set by the server. */
     @PostMapping("/add")
-    public ResponseEntity<Clarification> addClarification(@RequestBody Clarification clarification){
-        Clarification newClarification = clarificationService.addClarification(clarification);
+    public ResponseEntity<Clarification> addClarification(@RequestBody Clarification clarification, Authentication authentication){
+        User requester = userService.currentUser(authentication);
+        Clarification newClarification = clarificationService.addClarification(clarification, requester);
         return new ResponseEntity<>(newClarification, HttpStatus.CREATED);
     }
 
-    @RequestMapping("/all")
+    /** Admin: every clarification. */
+    @GetMapping("/all")
     public ResponseEntity<List<Clarification>> getAllClarification(){
         List<Clarification> clarifications = clarificationService.findAllClarifications();
         return new ResponseEntity<>(clarifications, HttpStatus.OK);
     }
-    @PutMapping("/update/{id}")
-    Clarification updateClarification(@RequestBody Clarification clarification, @PathVariable Long id){
-        return clarificationRepository.findById(id).map( clarification1 -> {
-            clarification1.setSubject(clarification.getSubject());
-            clarification1.setClarificationRequested(clarification.getClarificationRequested());
-            clarification1.setModule(clarification.getModule());
-            clarification1.setRequestedBy(clarification.getRequestedBy());
-            clarification1.setRequestedTo(clarification.getRequestedTo());
-            clarification1.setRequestedDate(clarification.getRequestedDate());
-            clarification1.setExpectedDateForClosure(clarification.getExpectedDateForClosure());
-            clarification1.setEmailReference(clarification.getEmailReference());
-            clarification1.setClarifiedDate(clarification.getClarifiedDate());
-            clarification1.setProvideClarification(clarification.getProvideClarification());
-            clarification1.setClarificationProvidedBy(clarification.getClarificationProvidedBy());
-            return clarificationRepository.save(clarification1);
-        }).orElseGet(()-> {
-            clarification.setId(id);
-            return clarificationRepository.save(clarification);
-        });
+
+    /** scope=assigned: requested from me. scope=requested: raised by me. */
+    @GetMapping("/mine")
+    public ResponseEntity<List<Clarification>> getMyClarifications(@RequestParam(defaultValue = "assigned") String scope,
+                                                                   Authentication authentication) {
+        User user = userService.currentUser(authentication);
+        List<Clarification> clarifications = "requested".equals(scope)
+                ? clarificationService.findRequestedBy(user)
+                : clarificationService.findAssignedTo(user);
+        return new ResponseEntity<>(clarifications, HttpStatus.OK);
+    }
+
+    @PatchMapping("/{id}/answer")
+    public ResponseEntity<Clarification> answerClarification(@PathVariable Long id, @RequestBody Map<String, String> body,
+                                                             Authentication authentication) {
+        User user = userService.currentUser(authentication);
+        Clarification clarification = clarificationService.answer(id, body.get("provideClarification"), user);
+        return new ResponseEntity<>(clarification, HttpStatus.OK);
     }
 
     @GetMapping("/find/{id}")
-    public ResponseEntity<Clarification> getClarificationById(@PathVariable Long id) throws ClassNotFoundException {
-        Clarification clarification = clarificationService.findClarificationById(id);
+    public ResponseEntity<Clarification> getClarificationById(@PathVariable Long id, Authentication authentication) {
+        Clarification clarification = clarificationService.findClarificationById(id, userService.currentUser(authentication));
         return new ResponseEntity<>(clarification, HttpStatus.OK);
     }
 }
